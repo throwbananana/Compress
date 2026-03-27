@@ -379,7 +379,7 @@ def inject_before_body_close(raw_html: str, snippet: str) -> str:
 
 def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content.rstrip() + "\n", encoding="utf-8")
+    path.write_text(content.lstrip("\r\n").rstrip() + "\n", encoding="utf-8")
 
 
 def render_local_properties(sdk_path: str) -> str:
@@ -392,6 +392,9 @@ def render_settings_gradle(module_slug: str) -> str:
         f"""
         pluginManagement {{
             repositories {{
+                maven {{ url 'https://maven.aliyun.com/repository/gradle-plugin' }}
+                maven {{ url 'https://maven.aliyun.com/repository/google' }}
+                maven {{ url 'https://maven.aliyun.com/repository/public' }}
                 google()
                 mavenCentral()
                 gradlePluginPortal()
@@ -401,6 +404,8 @@ def render_settings_gradle(module_slug: str) -> str:
         dependencyResolutionManagement {{
             repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
             repositories {{
+                maven {{ url 'https://maven.aliyun.com/repository/google' }}
+                maven {{ url 'https://maven.aliyun.com/repository/public' }}
                 google()
                 mavenCentral()
             }}
@@ -503,7 +508,13 @@ def render_app_build_gradle(package_name: str, min_sdk: int, target_sdk: int) ->
             }}
         }}
 
+        configurations.configureEach {{
+            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+        }}
+
         dependencies {{
+            implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
             implementation 'androidx.appcompat:appcompat:1.7.0'
             implementation 'androidx.webkit:webkit:1.11.0'
             implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'

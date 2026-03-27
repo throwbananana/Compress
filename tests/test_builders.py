@@ -83,6 +83,15 @@ class TestBuilders(unittest.TestCase):
             self.assertIn('href="../compass-mobile-adapter.css"', nested_html)
             self.assertIn('src="../compass-mobile-adapter.js"', nested_html)
 
+            settings_gradle = (output_dir / "settings.gradle").read_text(encoding="utf-8")
+            colors_xml = (output_dir / "app" / "src" / "main" / "res" / "values" / "colors.xml").read_text(encoding="utf-8")
+            app_build_gradle = (output_dir / "app" / "build.gradle").read_text(encoding="utf-8")
+            self.assertIn("https://maven.aliyun.com/repository/google", settings_gradle)
+            self.assertIn("https://maven.aliyun.com/repository/public", settings_gradle)
+            self.assertTrue(colors_xml.startswith("<?xml"))
+            self.assertIn("kotlin-bom:1.8.22", app_build_gradle)
+            self.assertIn("kotlin-stdlib-jdk8", app_build_gradle)
+
     def test_build_android_prepares_gradle_apk_command(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source_dir = Path(temp_dir) / "webapp"
