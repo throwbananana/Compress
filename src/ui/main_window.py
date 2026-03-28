@@ -2,7 +2,8 @@ import json
 import os
 import re
 
-from PySide6.QtCore import QProcess
+from PySide6.QtCore import QProcess, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -24,7 +25,12 @@ from PySide6.QtWidgets import (
 )
 
 from src.core.builders import Builder
-from src.core.config import AndroidConfig, CSharpConfig, JavaConfig, NodeConfig, PythonConfig
+from src.core.python_android import (
+    find_built_artifacts,
+    suggest_python_android_assets,
+    suggest_python_android_requirements,
+)
+from src.core.config import AndroidConfig, CSharpConfig, JavaConfig, NodeConfig, PythonConfig, PythonAndroidConfig
 from src.core.utils import get_resource_path
 
 
@@ -41,6 +47,13 @@ class MultiPackagerApp(QMainWindow):
         self.android_package_auto = True
         self.current_success_message = ""
         self.current_failure_message = ""
+        self.py_android_requirements_auto = True
+        self.py_android_icon_auto = True
+        self.py_android_presplash_auto = True
+        self.current_artifact_dir = ""
+        self.current_artifact_patterns = []
+        self.current_buildozer_spec = ""
+        self.py_android_fields = []
 
         self.load_translations()
         self.init_ui()
@@ -156,7 +169,6 @@ class MultiPackagerApp(QMainWindow):
         layout.addRow(self.py_entry_label, self.py_entry)
 
         self.py_backend = QComboBox()
-        self.py_backend.addItems(["PyInstaller", "Nuitka"])
         self.py_backend_label = QLabel()
         layout.addRow(self.py_backend_label, self.py_backend)
 
@@ -182,8 +194,184 @@ class MultiPackagerApp(QMainWindow):
         layout.addRow("", self.py_noconsole)
         layout.addRow("", self.py_clean)
 
+        self.py_android_title_label = QLabel()
+        self.py_android_title = QLineEdit()
+        layout.addRow(self.py_android_title_label, self.py_android_title)
+
+        self.py_android_domain_label = QLabel()
+        self.py_android_domain = QLineEdit()
+        self.py_android_domain.setText("org.compass")
+        layout.addRow(self.py_android_domain_label, self.py_android_domain)
+
+        self.py_android_package_label = QLabel()
+        self.py_android_package = QLineEdit()
+        layout.addRow(self.py_android_package_label, self.py_android_package)
+
+        self.py_android_version_label = QLabel()
+        self.py_android_version = QLineEdit()
+        layout.addRow(self.py_android_version_label, self.py_android_version)
+
+        self.py_android_requirements_label = QLabel()
+        self.py_android_requirements = QLineEdit()
+        self.py_android_requirements_btn = QPushButton()
+        self.py_android_requirements_btn.clicked.connect(self.rescan_python_android_requirements)
+        self.py_android_requirements.textEdited.connect(self.mark_python_android_requirements_manual)
+        py_android_requirements_layout = QHBoxLayout()
+        py_android_requirements_layout.addWidget(self.py_android_requirements)
+        py_android_requirements_layout.addWidget(self.py_android_requirements_btn)
+        layout.addRow(self.py_android_requirements_label, py_android_requirements_layout)
+
+        self.py_android_permissions_label = QLabel()
+        self.py_android_permissions = QLineEdit()
+        self.py_android_permissions.setText("INTERNET")
+        layout.addRow(self.py_android_permissions_label, self.py_android_permissions)
+
+        self.py_android_orientation_label = QLabel()
+        self.py_android_orientation = QComboBox()
+        layout.addRow(self.py_android_orientation_label, self.py_android_orientation)
+
+        self.py_android_min_sdk_label = QLabel()
+        self.py_android_min_sdk = QSpinBox()
+        self.py_android_min_sdk.setRange(21, 40)
+        self.py_android_min_sdk.setValue(24)
+        layout.addRow(self.py_android_min_sdk_label, self.py_android_min_sdk)
+
+        self.py_android_target_sdk_label = QLabel()
+        self.py_android_target_sdk = QSpinBox()
+        self.py_android_target_sdk.setRange(21, 40)
+        self.py_android_target_sdk.setValue(35)
+        layout.addRow(self.py_android_target_sdk_label, self.py_android_target_sdk)
+
+        self.py_android_icon_label = QLabel()
+        self.py_android_icon = QLineEdit()
+        self.py_android_icon.textEdited.connect(self.mark_python_android_icon_manual)
+        self.py_android_icon_btn = QPushButton()
+        self.py_android_icon_btn.clicked.connect(lambda: self.browse_file(self.py_android_icon, "Images (*.png *.jpg *.jpeg);;All Files (*)"))
+        self.py_android_assets_btn = QPushButton()
+        self.py_android_assets_btn.clicked.connect(self.rescan_python_android_assets)
+        py_android_icon_layout = QHBoxLayout()
+        py_android_icon_layout.addWidget(self.py_android_icon)
+        py_android_icon_layout.addWidget(self.py_android_icon_btn)
+        py_android_icon_layout.addWidget(self.py_android_assets_btn)
+        layout.addRow(self.py_android_icon_label, py_android_icon_layout)
+
+        self.py_android_presplash_label = QLabel()
+        self.py_android_presplash = QLineEdit()
+        self.py_android_presplash.textEdited.connect(self.mark_python_android_presplash_manual)
+        self.py_android_presplash_btn = QPushButton()
+        self.py_android_presplash_btn.clicked.connect(lambda: self.browse_file(self.py_android_presplash, "Images (*.png *.jpg *.jpeg);;All Files (*)"))
+        py_android_presplash_layout = QHBoxLayout()
+        py_android_presplash_layout.addWidget(self.py_android_presplash)
+        py_android_presplash_layout.addWidget(self.py_android_presplash_btn)
+        layout.addRow(self.py_android_presplash_label, py_android_presplash_layout)
+
+        self.py_android_buildozer_label = QLabel()
+        self.py_android_buildozer = QLineEdit()
+        self.py_android_buildozer_btn = QPushButton()
+        self.py_android_buildozer_btn.clicked.connect(self.browse_python_buildozer)
+        py_android_buildozer_layout = QHBoxLayout()
+        py_android_buildozer_layout.addWidget(self.py_android_buildozer)
+        py_android_buildozer_layout.addWidget(self.py_android_buildozer_btn)
+        layout.addRow(self.py_android_buildozer_label, py_android_buildozer_layout)
+
+        self.py_android_open_spec_btn = QPushButton()
+        self.py_android_open_spec_btn.clicked.connect(self.open_python_android_spec)
+        self.py_android_open_spec_btn.setEnabled(False)
+        layout.addRow("", self.py_android_open_spec_btn)
+
+        self.py_android_hint = QLabel()
+        self.py_android_hint.setWordWrap(True)
+        self.py_android_hint.setStyleSheet("color: #777777;")
+        layout.addRow("", self.py_android_hint)
+
+        self.py_android_fields = [
+            self.py_android_title_label, self.py_android_title,
+            self.py_android_domain_label, self.py_android_domain,
+            self.py_android_package_label, self.py_android_package,
+            self.py_android_version_label, self.py_android_version,
+            self.py_android_requirements_label, self.py_android_requirements, self.py_android_requirements_btn,
+            self.py_android_permissions_label, self.py_android_permissions,
+            self.py_android_orientation_label, self.py_android_orientation,
+            self.py_android_min_sdk_label, self.py_android_min_sdk,
+            self.py_android_target_sdk_label, self.py_android_target_sdk,
+            self.py_android_icon_label, self.py_android_icon, self.py_android_icon_btn, self.py_android_assets_btn,
+            self.py_android_presplash_label, self.py_android_presplash, self.py_android_presplash_btn,
+            self.py_android_buildozer_label, self.py_android_buildozer, self.py_android_buildozer_btn,
+            self.py_android_open_spec_btn,
+            self.py_android_hint,
+        ]
+
         widget.setLayout(layout)
         self.py_input.textChanged.connect(self.scan_python_entry)
+        self.py_backend.currentIndexChanged.connect(self.update_python_backend_fields)
+
+    def set_python_backends(self):
+        current_backend = self.py_backend.currentData()
+        options = [
+            ("pyinstaller", self.tr("py_backend_pyinstaller")),
+            ("nuitka", self.tr("py_backend_nuitka")),
+            ("buildozer_debug", self.tr("py_backend_buildozer_debug")),
+            ("buildozer_release", self.tr("py_backend_buildozer_release")),
+        ]
+
+        self.py_backend.blockSignals(True)
+        self.py_backend.clear()
+        selected_index = 0
+        for index, (value, label) in enumerate(options):
+            self.py_backend.addItem(label, value)
+            if value == current_backend:
+                selected_index = index
+        self.py_backend.setCurrentIndex(selected_index)
+        self.py_backend.blockSignals(False)
+
+    def set_python_android_orientations(self):
+        current_orientation = self.py_android_orientation.currentData()
+        options = [
+            ("portrait", self.tr("py_android_orientation_portrait")),
+            ("landscape", self.tr("py_android_orientation_landscape")),
+            ("portrait-reverse", self.tr("py_android_orientation_portrait_reverse")),
+            ("landscape-reverse", self.tr("py_android_orientation_landscape_reverse")),
+            ("all", self.tr("py_android_orientation_all")),
+        ]
+
+        self.py_android_orientation.blockSignals(True)
+        self.py_android_orientation.clear()
+        selected_index = 0
+        for index, (value, label) in enumerate(options):
+            self.py_android_orientation.addItem(label, value)
+            if value == current_orientation:
+                selected_index = index
+        self.py_android_orientation.setCurrentIndex(selected_index)
+        self.py_android_orientation.blockSignals(False)
+
+    def update_python_backend_fields(self, _index=None):
+        backend = self.py_backend.currentData() or "pyinstaller"
+        is_android = backend.startswith("buildozer_")
+
+        self.py_interpreter.setEnabled(not is_android)
+        self.py_interp_btn.setEnabled(not is_android)
+        self.py_onefile.setEnabled(not is_android)
+        self.py_noconsole.setEnabled(not is_android)
+        self.py_clean.setEnabled(not is_android)
+
+        for widget in self.py_android_fields:
+            widget.setVisible(is_android)
+
+        if is_android:
+            entry = self.py_entry.currentText() or self.py_input.text().strip()
+            self.autofill_python_android_requirements(entry)
+            self.autofill_python_android_assets(entry)
+        self.update_python_android_spec_button()
+
+    def browse_python_buildozer(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            self.tr("dialog_select"),
+            "",
+            "Buildozer Executable (buildozer);;All Files (*)",
+        )
+        if path:
+            self.py_android_buildozer.setText(path)
 
     def setup_csharp_ui(self, widget):
         layout = QFormLayout()
@@ -370,11 +558,42 @@ class MultiPackagerApp(QMainWindow):
         self.py_input.setPlaceholderText(self.tr("py_input_ph"))
         self.py_entry_label.setText(self.tr("py_entry_label"))
         self.py_backend_label.setText(self.tr("py_backend_label"))
+        self.set_python_backends()
         self.py_interpreter_label.setText(self.tr("py_interpreter_label"))
         self.py_interpreter.setPlaceholderText(self.tr("py_interpreter_ph"))
         self.py_onefile.setText(self.tr("py_onefile"))
         self.py_noconsole.setText(self.tr("py_noconsole"))
         self.py_clean.setText(self.tr("py_clean"))
+        self.py_android_title_label.setText(self.tr("py_android_title_label"))
+        self.py_android_title.setPlaceholderText(self.tr("py_android_title_ph"))
+        self.py_android_domain_label.setText(self.tr("py_android_domain_label"))
+        self.py_android_domain.setPlaceholderText(self.tr("py_android_domain_ph"))
+        self.py_android_package_label.setText(self.tr("py_android_package_label"))
+        self.py_android_package.setPlaceholderText(self.tr("py_android_package_ph"))
+        self.py_android_version_label.setText(self.tr("py_android_version_label"))
+        self.py_android_version.setPlaceholderText(self.tr("py_android_version_ph"))
+        self.py_android_requirements_label.setText(self.tr("py_android_requirements_label"))
+        self.py_android_requirements.setPlaceholderText(self.tr("py_android_requirements_ph"))
+        self.py_android_requirements_btn.setText(self.tr("btn_rescan"))
+        self.py_android_permissions_label.setText(self.tr("py_android_permissions_label"))
+        self.py_android_permissions.setPlaceholderText(self.tr("py_android_permissions_ph"))
+        self.py_android_orientation_label.setText(self.tr("py_android_orientation_label"))
+        self.set_python_android_orientations()
+        self.py_android_min_sdk_label.setText(self.tr("py_android_min_sdk_label"))
+        self.py_android_target_sdk_label.setText(self.tr("py_android_target_sdk_label"))
+        self.py_android_icon_label.setText(self.tr("py_android_icon_label"))
+        self.py_android_icon.setPlaceholderText(self.tr("py_android_icon_ph"))
+        self.py_android_icon_btn.setText(self.tr("btn_browse_file"))
+        self.py_android_assets_btn.setText(self.tr("btn_rescan"))
+        self.py_android_presplash_label.setText(self.tr("py_android_presplash_label"))
+        self.py_android_presplash.setPlaceholderText(self.tr("py_android_presplash_ph"))
+        self.py_android_presplash_btn.setText(self.tr("btn_browse_file"))
+        self.py_android_buildozer_label.setText(self.tr("py_android_buildozer_label"))
+        self.py_android_buildozer.setPlaceholderText(self.tr("py_android_buildozer_ph"))
+        self.py_android_buildozer_btn.setText(self.tr("btn_browse_file"))
+        self.py_android_open_spec_btn.setText(self.tr("py_android_open_spec"))
+        self.py_android_hint.setText(self.tr("py_android_hint"))
+        self.update_python_backend_fields()
         self.py_file_btn.setText(self.tr("btn_file_short"))
         self.py_folder_btn.setText(self.tr("btn_folder_short"))
 
@@ -502,6 +721,8 @@ class MultiPackagerApp(QMainWindow):
         self.py_entry.clear()
         if os.path.isfile(path):
             self.py_entry.addItem(path)
+            self.autofill_python_android_requirements(path)
+            self.autofill_python_android_assets(path)
             return
 
         candidates = []
@@ -520,6 +741,81 @@ class MultiPackagerApp(QMainWindow):
                 best = candidate
         if best:
             self.py_entry.setCurrentText(best)
+            self.autofill_python_android_requirements(best)
+            self.autofill_python_android_assets(best)
+
+    def mark_python_android_requirements_manual(self, _text):
+        self.py_android_requirements_auto = False
+
+    def rescan_python_android_requirements(self):
+        entry = self.py_entry.currentText() or self.py_input.text().strip()
+        self.autofill_python_android_requirements(entry, force=True)
+
+    def autofill_python_android_requirements(self, entry, force=False):
+        if not entry:
+            return
+        if not force and not self.py_android_requirements_auto and self.py_android_requirements.text().strip():
+            return
+        try:
+            suggestion = suggest_python_android_requirements(entry)
+        except Exception:
+            return
+
+        self.py_android_requirements.blockSignals(True)
+        self.py_android_requirements.setText(suggestion.get("requirements", ""))
+        self.py_android_requirements.blockSignals(False)
+        self.py_android_requirements_auto = True
+
+        sources = suggestion.get("sources") or []
+        if force:
+            summary = ", ".join(sources) if sources else self.tr("py_android_requirements_default_source")
+            self.log_output.append(self.tr("py_android_requirements_rescanned").format(summary, suggestion.get("requirements", "")))
+
+    def mark_python_android_icon_manual(self, _text):
+        self.py_android_icon_auto = False
+
+    def mark_python_android_presplash_manual(self, _text):
+        self.py_android_presplash_auto = False
+
+    def rescan_python_android_assets(self):
+        entry = self.py_entry.currentText() or self.py_input.text().strip()
+        self.autofill_python_android_assets(entry, force=True)
+
+    def autofill_python_android_assets(self, entry, force=False):
+        if not entry:
+            return
+        try:
+            suggestion = suggest_python_android_assets(entry)
+        except Exception:
+            return
+
+        if force or self.py_android_icon_auto or not self.py_android_icon.text().strip():
+            self.py_android_icon.blockSignals(True)
+            self.py_android_icon.setText(suggestion.get("icon_path", ""))
+            self.py_android_icon.blockSignals(False)
+            self.py_android_icon_auto = True
+
+        if force or self.py_android_presplash_auto or not self.py_android_presplash.text().strip():
+            self.py_android_presplash.blockSignals(True)
+            self.py_android_presplash.setText(suggestion.get("presplash_path", ""))
+            self.py_android_presplash.blockSignals(False)
+            self.py_android_presplash_auto = True
+
+        if force:
+            icon_text = suggestion.get("icon_path") or self.tr("py_android_asset_not_found")
+            presplash_text = suggestion.get("presplash_path") or self.tr("py_android_asset_not_found")
+            self.log_output.append(self.tr("py_android_assets_rescanned").format(icon_text, presplash_text))
+
+    def open_python_android_spec(self):
+        spec_path = self.current_buildozer_spec
+        if not spec_path or not os.path.exists(spec_path):
+            QMessageBox.information(self, self.tr("msg_fail_title"), self.tr("py_android_open_spec_missing"))
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(spec_path))
+
+    def update_python_android_spec_button(self):
+        can_open = bool(self.current_buildozer_spec and os.path.exists(self.current_buildozer_spec))
+        self.py_android_open_spec_btn.setEnabled(can_open and ((self.py_backend.currentData() or "").startswith("buildozer_")))
 
     def scan_android_folder(self, path):
         self.android_entry.clear()
@@ -591,12 +887,47 @@ class MultiPackagerApp(QMainWindow):
     def start_build(self):
         idx = self.lang_combo.currentIndex()
         cmd, cwd = None, None
+        if idx != 0 or not ((self.py_backend.currentData() or "").startswith("buildozer_")):
+            self.current_buildozer_spec = ""
+            self.update_python_android_spec_button()
 
         try:
             if idx == 0:
+                backend_value = self.py_backend.currentData() or "pyinstaller"
+                if backend_value in {"buildozer_debug", "buildozer_release"}:
+                    config = PythonAndroidConfig(
+                        entry=self.py_entry.currentText() or self.py_input.text(),
+                        app_name=self.py_android_title.text().strip(),
+                        package_domain=self.py_android_domain.text().strip(),
+                        package_name=self.py_android_package.text().strip(),
+                        version=self.py_android_version.text().strip(),
+                        requirements=self.py_android_requirements.text().strip(),
+                        orientation=self.py_android_orientation.currentData() or "portrait",
+                        permissions=self.py_android_permissions.text().strip(),
+                        min_sdk=self.py_android_min_sdk.value(),
+                        target_sdk=self.py_android_target_sdk.value(),
+                        icon_path=self.py_android_icon.text().strip(),
+                        presplash_path=self.py_android_presplash.text().strip(),
+                        build_mode="release" if backend_value == "buildozer_release" else "debug",
+                        buildozer_path=self.py_android_buildozer.text().strip(),
+                    )
+                    self.build_btn.setEnabled(False)
+                    QApplication.processEvents()
+                    result = Builder.build_python_android(config)
+                    self.run_process(
+                        result["cmd"],
+                        result["cwd"],
+                        initial_log=result["log_text"],
+                        success_message=self.tr("py_android_success").format(result["artifact_dir"]),
+                        fail_message=self.tr("py_android_fail"),
+                        artifact_dir=result["artifact_dir"],
+                        artifact_patterns=["*.apk", "*.aab"],
+                    )
+                    return
+
                 config = PythonConfig(
                     entry=self.py_entry.currentText() or self.py_input.text(),
-                    backend="nuitka" if self.py_backend.currentIndex() == 1 else "pyinstaller",
+                    backend=backend_value,
                     onefile=self.py_onefile.isChecked(),
                     noconsole=self.py_noconsole.isChecked(),
                     clean=self.py_clean.isChecked(),
@@ -654,15 +985,21 @@ class MultiPackagerApp(QMainWindow):
                         self.tr("msg_success_title"),
                         self.tr("android_msg_success").format(result["project_dir"]),
                     )
+                    self.current_buildozer_spec = result.get("buildozer_spec", "")
+                    self.update_python_android_spec_button()
                     self.build_btn.setEnabled(True)
                     return
 
+                self.current_buildozer_spec = result.get("buildozer_spec", "")
+                self.update_python_android_spec_button()
                 self.run_process(
                     result["cmd"],
                     result["cwd"],
                     initial_log=result["log_text"],
                     success_message=self.tr("android_package_success").format(result["artifact_dir"]),
                     fail_message=self.tr("android_package_fail"),
+                    artifact_dir=result["artifact_dir"],
+                    artifact_patterns=["*.apk", "*.aab"],
                 )
                 return
 
@@ -672,13 +1009,15 @@ class MultiPackagerApp(QMainWindow):
             self.build_btn.setEnabled(True)
             QMessageBox.critical(self, self.tr("err_title"), str(exc))
 
-    def run_process(self, cmd, cwd, initial_log="", success_message="", fail_message=""):
+    def run_process(self, cmd, cwd, initial_log="", success_message="", fail_message="", artifact_dir="", artifact_patterns=None):
         self.log_output.clear()
         if initial_log:
             self.log_output.append(initial_log.rstrip() + "\n")
         self.log_output.append(f"Starting Build...\nCMD: {' '.join(cmd)}\nCWD: {cwd}\n" + "-" * 40 + "\n")
         self.current_success_message = success_message or self.tr("msg_success")
         self.current_failure_message = fail_message or self.tr("msg_fail")
+        self.current_artifact_dir = artifact_dir or ""
+        self.current_artifact_patterns = artifact_patterns or []
         self.build_btn.setEnabled(False)
         self.process.setWorkingDirectory(cwd)
         self.process.start(cmd[0], cmd[1:])
@@ -696,8 +1035,37 @@ class MultiPackagerApp(QMainWindow):
     def process_finished(self):
         self.build_btn.setEnabled(True)
         if self.process.exitCode() == 0:
+            success_message = self.current_success_message or self.tr("msg_success")
+            detected_artifacts = self.find_detected_artifacts()
+            if detected_artifacts:
+                self.log_output.append("\n" + self.tr("artifacts_detected_log"))
+                for artifact in detected_artifacts:
+                    self.log_output.append(artifact)
+                success_message += "\n\n" + self.tr("artifacts_detected_msg").format("\n".join(detected_artifacts[:5]))
             self.log_output.append(f"\n{self.tr('msg_success')}")
-            QMessageBox.information(self, self.tr("msg_success_title"), self.current_success_message or self.tr("msg_success"))
+            if self.current_buildozer_spec and os.path.exists(self.current_buildozer_spec):
+                self.log_output.append(self.tr("py_android_spec_ready").format(self.current_buildozer_spec))
+            QMessageBox.information(self, self.tr("msg_success_title"), success_message)
         else:
             self.log_output.append(f"\n{self.tr('msg_fail')}")
             QMessageBox.critical(self, self.tr("msg_fail_title"), self.current_failure_message or self.tr("msg_fail"))
+
+    def find_detected_artifacts(self):
+        if not self.current_artifact_dir:
+            return []
+
+        patterns = tuple(self.current_artifact_patterns or [])
+        if patterns == ("*.apk", "*.aab"):
+            return find_built_artifacts(self.current_artifact_dir)
+
+        artifact_root = os.path.abspath(self.current_artifact_dir)
+        if not os.path.isdir(artifact_root):
+            return []
+
+        matches = []
+        for name in os.listdir(artifact_root):
+            full_path = os.path.join(artifact_root, name)
+            if os.path.isfile(full_path):
+                matches.append(full_path)
+        matches.sort(key=lambda item: os.path.getmtime(item), reverse=True)
+        return matches

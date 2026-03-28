@@ -11,6 +11,24 @@ class PythonConfig:
     interpreter: Optional[str] = None
 
 @dataclass
+class PythonAndroidConfig:
+    entry: str
+    app_name: str = ''
+    package_domain: str = 'org.compass'
+    package_name: str = ''
+    version: str = ''
+    requirements: str = ''
+    orientation: str = 'portrait'
+    permissions: str = 'INTERNET'
+    min_sdk: int = 24
+    target_sdk: int = 35
+    icon_path: str = ''
+    presplash_path: str = ''
+    build_mode: str = 'debug'  # 'debug' or 'release'
+    buildozer_path: str = ''
+
+
+@dataclass
 class CSharpConfig:
     project_path: str
     rid: str = 'win-x64'

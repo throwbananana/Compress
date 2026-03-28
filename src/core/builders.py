@@ -3,6 +3,7 @@ import os
 import shutil
 
 from .android_project import build_android_project
+from .python_android import build_python_android_package
 
 class Builder:
     """
@@ -99,6 +100,13 @@ class Builder:
             cmd.append(f"--specpath={project_dir}")
 
         return cmd, project_dir
+
+    @staticmethod
+    def build_python_android(config: 'PythonAndroidConfig'):
+        """
+        Prepare a Buildozer/python-for-android packaging project for Android.
+        """
+        return build_python_android_package(config)
 
     @staticmethod
     def build_csharp(config: 'CSharpConfig'):

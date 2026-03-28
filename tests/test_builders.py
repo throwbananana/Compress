@@ -8,8 +8,9 @@ from pathlib import Path
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from core.config import AndroidConfig, PythonConfig, CSharpConfig, NodeConfig, JavaConfig
+from core.config import AndroidConfig, PythonConfig, PythonAndroidConfig, CSharpConfig, NodeConfig, JavaConfig
 from core.builders import Builder
+from core.python_android import find_built_artifacts, suggest_python_android_assets, suggest_python_android_requirements
 
 class TestBuilders(unittest.TestCase):
 
@@ -47,6 +48,223 @@ class TestBuilders(unittest.TestCase):
         self.assertIn("--type=msi", cmd)
         self.assertIn("app.jar", cmd)
 
+
+    @patch('core.python_android.shutil.which', return_value='/bin/sh')
+    def test_build_python_android_generates_staging_project(self, mock_which):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            source_dir.mkdir()
+            (source_dir / "app.py").write_text('__version__ = "1.2.3"\nprint("hello")\n', encoding='utf-8')
+            (source_dir / "helper.py").write_text('print("helper")\n', encoding='utf-8')
+
+            config = PythonAndroidConfig(
+                entry=str(source_dir / "app.py"),
+                app_name="Demo Python App",
+                package_domain="com.demo",
+                package_name="demo-python-app",
+                requirements="kivy,requests",
+                orientation="landscape",
+                build_mode="debug",
+            )
+            result = Builder.build_python_android(config)
+
+            stage_dir = Path(result["project_dir"])
+            self.assertTrue(stage_dir.exists())
+            self.assertEqual(result["cmd"][-1], "debug")
+            self.assertTrue(result["buildozer_spec"].endswith("buildozer.spec"))
+            self.assertEqual(result["cwd"], str(stage_dir))
+            self.assertTrue((stage_dir / "buildozer.spec").exists())
+            self.assertTrue((stage_dir / "app" / "app.py").exists())
+            self.assertTrue((stage_dir / "app" / "helper.py").exists())
+            wrapper = (stage_dir / "app" / "main.py").read_text(encoding='utf-8')
+            self.assertIn("runpy.run_path", wrapper)
+            self.assertIn("app.py", wrapper)
+
+            spec = (stage_dir / "buildozer.spec").read_text(encoding='utf-8')
+            self.assertIn("title = Demo Python App", spec)
+            self.assertIn("package.name = demopythonapp", spec)
+            self.assertIn("package.domain = com.demo", spec)
+            self.assertIn("version = 1.2.3", spec)
+            self.assertIn("requirements = python3,kivy,requests", spec)
+            self.assertIn("orientation = landscape", spec)
+            self.assertIn("android.permissions = INTERNET", spec)
+            self.assertIn("source.dir = app", spec)
+            self.assertIn("android.api = 35", spec)
+            self.assertIn("bin", result["artifact_dir"])
+            self.assertIn("Python Android packaging project generated successfully.", result["log_text"])
+
+    @patch('core.python_android.shutil.which', return_value='/bin/sh')
+    def test_build_python_android_uses_existing_main(self, mock_which):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            source_dir.mkdir()
+            (source_dir / "main.py").write_text('print("hello")\n', encoding='utf-8')
+
+            config = PythonAndroidConfig(
+                entry=str(source_dir / "main.py"),
+                app_name="My App",
+                build_mode="release",
+            )
+            result = Builder.build_python_android(config)
+
+            stage_dir = Path(result["project_dir"])
+            staged_main = (stage_dir / "app" / "main.py").read_text(encoding='utf-8')
+            self.assertEqual(staged_main, 'print("hello")\n')
+            self.assertEqual(result["cmd"][-1], "release")
+            self.assertIn("package.domain = org.compass", (stage_dir / "buildozer.spec").read_text(encoding='utf-8'))
+
+    @patch('core.python_android.shutil.which', return_value='/bin/sh')
+    def test_build_python_android_supports_permissions_and_manual_assets(self, mock_which):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            (source_dir / "assets").mkdir(parents=True)
+            (source_dir / "main.py").write_text('print("hello")\n', encoding='utf-8')
+            (source_dir / "assets" / "custom-icon.png").write_text('icon', encoding='utf-8')
+            (source_dir / "assets" / "custom-splash.png").write_text('splash', encoding='utf-8')
+
+            config = PythonAndroidConfig(
+                entry=str(source_dir / "main.py"),
+                app_name="My App",
+                permissions="INTERNET, CAMERA, RECORD_AUDIO",
+                orientation="portrait-reverse",
+                min_sdk=26,
+                target_sdk=34,
+                icon_path="assets/custom-icon.png",
+                presplash_path="assets/custom-splash.png",
+            )
+            result = Builder.build_python_android(config)
+
+            stage_dir = Path(result["project_dir"])
+            spec = (stage_dir / "buildozer.spec").read_text(encoding='utf-8')
+            readme = (stage_dir / "README.md").read_text(encoding='utf-8')
+            self.assertIn("android.permissions = INTERNET,CAMERA,RECORD_AUDIO", spec)
+            self.assertIn("orientation = portrait-reverse", spec)
+            self.assertIn("android.minapi = 26", spec)
+            self.assertIn("android.api = 34", spec)
+            self.assertIn("icon.filename = app/assets/custom-icon.png", spec)
+            self.assertIn("presplash.filename = app/assets/custom-splash.png", spec)
+            self.assertIn("Permissions: `INTERNET,CAMERA,RECORD_AUDIO`", readme)
+
+
+    @patch('core.python_android.shutil.which')
+    @patch('core.python_android.is_windows_mount_path', return_value=True)
+    @patch('core.python_android.is_probably_wsl', return_value=True)
+    def test_build_python_android_adds_environment_hints(self, mock_wsl, mock_mount, mock_which):
+        def which_side_effect(name):
+            if name == 'buildozer':
+                return '/bin/sh'
+            return None
+
+        mock_which.side_effect = which_side_effect
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / 'mnt' / 'c' / 'demoapp'
+            source_dir.mkdir(parents=True)
+            (source_dir / 'main.py').write_text('print("hello")\n', encoding='utf-8')
+
+            config = PythonAndroidConfig(entry=str(source_dir / 'main.py'))
+            result = Builder.build_python_android(config)
+
+            self.assertIn('Environment Hints:', result['log_text'])
+            self.assertIn('under /mnt/...', result['log_text'])
+            self.assertIn('adb was not found in PATH', result['log_text'])
+            self.assertIn('sdkmanager was not found in PATH', result['log_text'])
+
+    def test_find_built_artifacts_prefers_latest_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            artifact_dir = Path(temp_dir)
+            older = artifact_dir / 'app-debug.apk'
+            newer = artifact_dir / 'app-release.aab'
+            older.write_text('apk', encoding='utf-8')
+            newer.write_text('aab', encoding='utf-8')
+            os.utime(older, (1, 1))
+            os.utime(newer, (2, 2))
+
+            found = find_built_artifacts(str(artifact_dir))
+
+            self.assertEqual(found[0], str(newer))
+            self.assertEqual(found[1], str(older))
+
+    def test_suggest_python_android_requirements_reads_project_metadata(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            source_dir.mkdir()
+            (source_dir / "main.py").write_text('print("hello")\n', encoding='utf-8')
+            (source_dir / "requirements.txt").write_text('requests>=2\nhttpx==0.27\n', encoding='utf-8')
+
+            suggestion = suggest_python_android_requirements(str(source_dir / "main.py"))
+
+            self.assertEqual(suggestion["requirements"], "python3,requests,httpx")
+            self.assertIn("requirements.txt", suggestion["sources"])
+            self.assertFalse(suggestion["uses_kivy"])
+
+    def test_suggest_python_android_requirements_defaults_to_kivy_when_detected(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            source_dir.mkdir()
+            (source_dir / "main.py").write_text('from kivy.app import App\n', encoding='utf-8')
+
+            suggestion = suggest_python_android_requirements(str(source_dir / "main.py"))
+
+            self.assertEqual(suggestion["requirements"], "python3,kivy")
+            self.assertEqual(suggestion["sources"], [])
+            self.assertTrue(suggestion["uses_kivy"])
+
+
+    def test_suggest_python_android_assets_detects_icon_and_presplash(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            (source_dir / "assets").mkdir(parents=True)
+            (source_dir / "main.py").write_text('print("hello")\n', encoding='utf-8')
+            (source_dir / "assets" / "icon.png").write_text('icon', encoding='utf-8')
+            (source_dir / "assets" / "splash.png").write_text('splash', encoding='utf-8')
+
+            suggestion = suggest_python_android_assets(str(source_dir / "main.py"))
+
+            self.assertEqual(suggestion["icon_path"], "assets/icon.png")
+            self.assertEqual(suggestion["presplash_path"], "assets/splash.png")
+
+
+    @patch('core.python_android.shutil.which', return_value='/bin/sh')
+    def test_build_python_android_warns_about_metadata_and_requirement_risks(self, mock_which):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            source_dir.mkdir()
+            (source_dir / "main.py").write_text('print("hello")\n', encoding='utf-8')
+            (source_dir / "requirements.txt").write_text('requests>=2\n', encoding='utf-8')
+            (source_dir / "native_module.pyx").write_text('print("cython")\n', encoding='utf-8')
+
+            config = PythonAndroidConfig(
+                entry=str(source_dir / "main.py"),
+                requirements="requests>=2,git+https://example.com/demo.git,cython",
+            )
+            result = Builder.build_python_android(config)
+
+            self.assertIn("Compatibility Hints:", result["log_text"])
+            self.assertIn("Direct URL, wheel, or VCS-style requirement entries were detected", result["log_text"])
+            self.assertIn("Version ranges were detected in the Android requirements", result["log_text"])
+            self.assertIn("Compiled/native source files were detected", result["log_text"])
+            self.assertIn("native build steps were detected", result["log_text"])
+
+    @patch('core.python_android.shutil.which', return_value='/bin/sh')
+    def test_build_python_android_warns_when_project_metadata_exists_but_requirements_are_blank(self, mock_which):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_dir = Path(temp_dir) / "pyapp"
+            source_dir.mkdir()
+            (source_dir / "main.py").write_text('print("hello")\n', encoding='utf-8')
+            (source_dir / "pyproject.toml").write_text('[build-system]\nrequires = ["setuptools"]\n', encoding='utf-8')
+
+            config = PythonAndroidConfig(
+                entry=str(source_dir / "main.py"),
+                requirements="",
+            )
+            result = Builder.build_python_android(config)
+
+            readme = Path(result["project_dir"]) / "README.md"
+            readme_text = readme.read_text(encoding='utf-8')
+            self.assertIn("Project metadata files were detected (pyproject.toml)", result["log_text"])
+            self.assertIn("## Compatibility Hints", readme_text)
+            self.assertIn("pyproject.toml", readme_text)
     def test_build_android_generates_project(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             source_dir = Path(temp_dir) / "webapp"
