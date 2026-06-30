@@ -1,9 +1,7 @@
 import sys
 import os
 import shutil
-
-from .android_project import build_android_project
-from .python_android import build_python_android_package
+from src.core.utils import resolve_python_entry
 
 class Builder:
     """
@@ -20,8 +18,13 @@ class Builder:
         """
         Build Python application using PyInstaller or Nuitka.
         """
-        entry = config.entry
-        if not entry or not os.path.exists(entry):
+        original_entry = config.entry
+        entry = resolve_python_entry(original_entry)
+        if not entry:
+            if original_entry and os.path.isdir(original_entry):
+                raise ValueError(
+                    f"Could not find a Python entry file in folder: {original_entry}"
+                )
             raise ValueError("Invalid entry file.")
 
         project_dir = os.path.dirname(entry)
@@ -100,13 +103,6 @@ class Builder:
             cmd.append(f"--specpath={project_dir}")
 
         return cmd, project_dir
-
-    @staticmethod
-    def build_python_android(config: 'PythonAndroidConfig'):
-        """
-        Prepare a Buildozer/python-for-android packaging project for Android.
-        """
-        return build_python_android_package(config)
 
     @staticmethod
     def build_csharp(config: 'CSharpConfig'):
@@ -189,11 +185,3 @@ class Builder:
         cmd.append(f"--dest={os.path.join(project_dir, 'dist')}")
         
         return cmd, project_dir
-
-    @staticmethod
-    def build_android(config: 'AndroidConfig'):
-        """
-        Generate an Android Studio project from a local web folder and optionally
-        prepare a Gradle build command for APK/AAB output.
-        """
-        return build_android_project(config)

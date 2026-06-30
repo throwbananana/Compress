@@ -1,0 +1,175 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#090B12"/>
+      <stop offset="45%" stop-color="#0E1320"/>
+      <stop offset="100%" stop-color="#12192A"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1180 220) rotate(90) scale(320 420)">
+      <stop offset="0%" stop-color="#18D1FF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#18D1FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(320 700) rotate(90) scale(340 460)">
+      <stop offset="0%" stop-color="#7C5CFF" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#7C5CFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panelStroke" x1="250" y1="120" x2="1260" y2="770" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="white" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.03"/>
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="820" y1="160" x2="1180" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="white" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="accentLine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#15C7FF"/>
+      <stop offset="100%" stop-color="#7A61FF"/>
+    </linearGradient>
+    <linearGradient id="buttonGrad" x1="865" y1="448" x2="1080" y2="492" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#15C7FF"/>
+      <stop offset="100%" stop-color="#6D63FF"/>
+    </linearGradient>
+    <filter id="blurXL" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="44"/>
+    </filter>
+    <filter id="blurM" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="shadowSoft" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="30" stdDeviation="40" flood-color="#000814" flood-opacity="0.45"/>
+    </filter>
+    <filter id="innerGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10"/>
+    </filter>
+    <clipPath id="clipPanel">
+      <rect x="775" y="120" width="410" height="470" rx="36"/>
+    </clipPath>
+    <pattern id="gridPattern" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" stroke="white" stroke-opacity="0.05"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bgGrad)"/>
+  <rect width="1600" height="900" fill="url(#gridPattern)"/>
+  <circle cx="1180" cy="220" r="320" fill="url(#glowA)"/>
+  <circle cx="320" cy="700" r="340" fill="url(#glowB)"/>
+
+  <g opacity="0.62">
+    <path d="M0 677C167 604 279 576 427 575C584 574 638 648 792 638C1000 624 1087 462 1289 429C1408 410 1499 438 1600 490V900H0V677Z" fill="#0D1321"/>
+    <path d="M0 724C164 651 351 653 510 668C689 686 779 733 942 718C1122 701 1222 615 1386 601C1473 594 1539 610 1600 648" stroke="url(#accentLine)" stroke-opacity="0.26" stroke-width="2"/>
+    <path d="M0 761C185 696 328 715 480 736C664 761 783 793 956 779C1134 765 1250 700 1414 683C1474 676 1539 682 1600 699" stroke="url(#accentLine)" stroke-opacity="0.18" stroke-width="2"/>
+  </g>
+
+  <g transform="translate(155 98)">
+    <rect x="0" y="0" width="1080" height="640" rx="46" fill="rgba(255,255,255,0.03)" stroke="url(#panelStroke)" stroke-width="1.5"/>
+    <rect x="1.5" y="1.5" width="1077" height="637" rx="44.5" stroke="white" stroke-opacity="0.04"/>
+    <path d="M54 540L351 286L493 411L719 213L931 326" stroke="url(#accentLine)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="1 10" opacity="0.25"/>
+    <circle cx="351" cy="286" r="6" fill="#14C9FF" opacity="0.9"/>
+    <circle cx="719" cy="213" r="7" fill="#7A61FF" opacity="0.85"/>
+
+    <g filter="url(#blurM)">
+      <ellipse cx="885" cy="120" rx="96" ry="42" fill="#15C7FF" fill-opacity="0.17"/>
+      <ellipse cx="820" cy="150" rx="120" ry="52" fill="#7A61FF" fill-opacity="0.16"/>
+    </g>
+
+    <g opacity="0.8">
+      <rect x="72" y="132" width="274" height="165" rx="24" fill="rgba(255,255,255,0.035)" stroke="white" stroke-opacity="0.08"/>
+      <text x="102" y="177" fill="white" fill-opacity="0.86" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Secure Access</text>
+      <text x="102" y="216" fill="white" fill-opacity="0.52" font-family="Inter, Arial, sans-serif" font-size="15">Identity verified with layered encryption</text>
+      <rect x="102" y="244" width="190" height="10" rx="5" fill="white" fill-opacity="0.08"/>
+      <rect x="102" y="244" width="124" height="10" rx="5" fill="url(#accentLine)" fill-opacity="0.92"/>
+      <rect x="102" y="264" width="148" height="8" rx="4" fill="white" fill-opacity="0.06"/>
+      <rect x="102" y="282" width="96" height="8" rx="4" fill="white" fill-opacity="0.04"/>
+    </g>
+
+    <g filter="url(#shadowSoft)">
+      <rect x="620" y="54" width="420" height="500" rx="40" fill="rgba(13,18,31,0.52)" stroke="url(#panelStroke)" stroke-width="1.6"/>
+      <rect x="645" y="83" width="370" height="446" rx="34" fill="url(#cardGrad)" stroke="white" stroke-opacity="0.06"/>
+
+      <g clip-path="url(#clipPanel)">
+        <circle cx="1100" cy="110" r="110" fill="#15C7FF" fill-opacity="0.12" filter="url(#blurM)"/>
+        <circle cx="860" cy="580" r="140" fill="#7A61FF" fill-opacity="0.10" filter="url(#blurM)"/>
+      </g>
+
+      <g transform="translate(775 130)">
+        <circle cx="50" cy="44" r="34" fill="rgba(21,199,255,0.10)" stroke="rgba(255,255,255,0.08)"/>
+        <path d="M40 42V34C40 26.82 45.82 21 53 21C60.18 21 66 26.82 66 34V42" stroke="url(#accentLine)" stroke-width="4.2" stroke-linecap="round"/>
+        <rect x="33" y="40" width="40" height="34" rx="10" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.10)"/>
+        <circle cx="53" cy="56" r="4.5" fill="#15C7FF"/>
+        <rect x="51" y="58" width="4" height="9" rx="2" fill="#15C7FF"/>
+      </g>
+
+      <text x="775" y="255" fill="white" fill-opacity="0.92" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="700">Welcome back</text>
+      <text x="775" y="294" fill="white" fill-opacity="0.52" font-family="Inter, Arial, sans-serif" font-size="17">Log in to continue to your workspace</text>
+
+      <g transform="translate(775 336)">
+        <rect x="0" y="0" width="240" height="54" rx="16" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.10)"/>
+        <text x="22" y="33" fill="white" fill-opacity="0.42" font-family="Inter, Arial, sans-serif" font-size="15">Email address</text>
+      </g>
+
+      <g transform="translate(775 404)">
+        <rect x="0" y="0" width="240" height="54" rx="16" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.10)"/>
+        <circle cx="24" cy="27" r="3" fill="white" fill-opacity="0.4"/>
+        <circle cx="35" cy="27" r="3" fill="white" fill-opacity="0.4"/>
+        <circle cx="46" cy="27" r="3" fill="white" fill-opacity="0.4"/>
+        <circle cx="57" cy="27" r="3" fill="white" fill-opacity="0.4"/>
+        <circle cx="68" cy="27" r="3" fill="white" fill-opacity="0.4"/>
+        <circle cx="79" cy="27" r="3" fill="white" fill-opacity="0.4"/>
+      </g>
+
+      <g transform="translate(775 484)">
+        <rect x="0" y="0" width="240" height="56" rx="18" fill="url(#buttonGrad)"/>
+        <rect x="0.7" y="0.7" width="238.6" height="54.6" rx="17.3" stroke="white" stroke-opacity="0.18"/>
+        <text x="87" y="35" fill="white" font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700">Continue</text>
+      </g>
+
+      <g transform="translate(1034 339)">
+        <rect x="0" y="0" width="98" height="98" rx="22" fill="rgba(255,255,255,0.045)" stroke="rgba(255,255,255,0.09)"/>
+        <circle cx="49" cy="38" r="16" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.09)"/>
+        <path d="M49 20L56 32L70 34L60 44L62 58L49 51L36 58L38 44L28 34L42 32L49 20Z" fill="url(#accentLine)" opacity="0.88"/>
+        <text x="24" y="81" fill="white" fill-opacity="0.52" font-family="Inter, Arial, sans-serif" font-size="12">Trusted</text>
+      </g>
+
+      <g transform="translate(1038 453)">
+        <rect x="0" y="0" width="95" height="61" rx="20" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)"/>
+        <path d="M24 31H72" stroke="white" stroke-opacity="0.18" stroke-width="2" stroke-linecap="round"/>
+        <path d="M24 22H61" stroke="#15C7FF" stroke-opacity="0.85" stroke-width="3" stroke-linecap="round"/>
+        <path d="M24 40H51" stroke="#7A61FF" stroke-opacity="0.9" stroke-width="3" stroke-linecap="round"/>
+      </g>
+    </g>
+
+    <g transform="translate(70 378)">
+      <rect x="0" y="0" width="328" height="166" rx="28" fill="rgba(255,255,255,0.028)" stroke="rgba(255,255,255,0.07)"/>
+      <text x="30" y="45" fill="white" fill-opacity="0.78" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Adaptive verification</text>
+      <text x="30" y="76" fill="white" fill-opacity="0.44" font-family="Inter, Arial, sans-serif" font-size="14">Smart signals continuously protect every sign-in.</text>
+      <g transform="translate(30 98)">
+        <rect x="0" y="0" width="54" height="40" rx="14" fill="rgba(21,199,255,0.08)" stroke="rgba(21,199,255,0.24)"/>
+        <path d="M27 10L39 16V24C39 31.8 33.2 38.1 27 40C20.8 38.1 15 31.8 15 24V16L27 10Z" fill="url(#accentLine)"/>
+      </g>
+      <g transform="translate(102 98)">
+        <rect x="0" y="0" width="54" height="40" rx="14" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)"/>
+        <path d="M15 26C19 17 23 13 27 13C31 13 35 17 39 26" stroke="#15C7FF" stroke-width="2.6" stroke-linecap="round"/>
+        <circle cx="27" cy="20" r="4" fill="#7A61FF"/>
+      </g>
+      <g transform="translate(174 98)">
+        <rect x="0" y="0" width="54" height="40" rx="14" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)"/>
+        <path d="M18 28L25 21L31 26L39 17" stroke="url(#accentLine)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </g>
+
+    <g opacity="0.65">
+      <rect x="444" y="92" width="88" height="88" rx="28" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.07)"/>
+      <path d="M470 136C470 117.22 485.22 102 504 102C522.78 102 538 117.22 538 136C538 154.78 522.78 170 504 170C485.22 170 470 154.78 470 136Z" stroke="url(#accentLine)" stroke-width="2"/>
+      <path d="M504 114V136L518 144" stroke="white" stroke-opacity="0.68" stroke-width="2.6" stroke-linecap="round"/>
+    </g>
+
+  </g>
+
+  <g opacity="0.22">
+    <circle cx="1410" cy="124" r="2.2" fill="white"/>
+    <circle cx="1474" cy="176" r="2.2" fill="white"/>
+    <circle cx="1340" cy="208" r="1.8" fill="white"/>
+    <circle cx="1292" cy="102" r="1.8" fill="#15C7FF"/>
+    <circle cx="1540" cy="120" r="1.8" fill="#7A61FF"/>
+  </g>
+</svg>

@@ -7,6 +7,89 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QFileDialog, QCheckBox, QTextEdit, QGroupBox, QMessageBox, QComboBox, QStackedWidget, QFormLayout)
 from PySide6.QtCore import QProcess, Qt
 
+PYTHON_ENTRY_PRIORITY = (
+    "__main__.py",
+    "main.py",
+    "app.py",
+    "gui.py",
+    "start.py",
+)
+
+PYTHON_SCAN_IGNORED_DIRS = {
+    "__pycache__",
+    ".git",
+    ".hg",
+    ".svn",
+    ".venv",
+    "venv",
+    "env",
+    "build",
+    "dist",
+    "node_modules",
+    "tests",
+    "test",
+}
+
+def list_python_entry_candidates(path, max_depth=3):
+    if not path:
+        return []
+
+    path = os.path.abspath(os.path.expanduser(path.strip()))
+    if not os.path.exists(path):
+        return []
+
+    if os.path.isfile(path):
+        return [path] if path.lower().endswith(".py") else []
+
+    candidates = []
+    seen = set()
+
+    def add_candidate(candidate):
+        candidate = os.path.abspath(candidate)
+        if candidate in seen:
+            return
+        if os.path.isfile(candidate) and candidate.lower().endswith(".py"):
+            seen.add(candidate)
+            candidates.append(candidate)
+
+    for priority_name in PYTHON_ENTRY_PRIORITY:
+        add_candidate(os.path.join(path, priority_name))
+
+    base_name = os.path.basename(path)
+    for nested_dir in (os.path.join(path, base_name), os.path.join(path, "src")):
+        for priority_name in PYTHON_ENTRY_PRIORITY:
+            add_candidate(os.path.join(nested_dir, priority_name))
+
+    try:
+        for name in sorted(os.listdir(path)):
+            if name.lower().endswith(".py"):
+                add_candidate(os.path.join(path, name))
+    except OSError:
+        return candidates
+
+    for root, dirs, files in os.walk(path):
+        rel_root = os.path.relpath(root, path)
+        depth = 0 if rel_root == "." else rel_root.count(os.sep) + 1
+
+        dirs[:] = [
+            directory
+            for directory in dirs
+            if directory not in PYTHON_SCAN_IGNORED_DIRS and depth < max_depth
+        ]
+
+        if depth == 0:
+            continue
+
+        for name in sorted(files):
+            if name.lower().endswith(".py"):
+                add_candidate(os.path.join(root, name))
+
+    return candidates
+
+def resolve_python_entry(path):
+    candidates = list_python_entry_candidates(path)
+    return candidates[0] if candidates else None
+
 class MultiPackagerApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -66,6 +149,7 @@ class MultiPackagerApp(QMainWindow):
                 # Errors
                 'err_title': "Error",
                 'err_no_input': "Please select an input file/project.",
+                'err_py_entry_not_found': "Could not find a Python entry file in:\n{}\n\nSelect a .py file directly or choose a detected entry point.",
                 'err_tool_missing': "Build tool '{}' not found in PATH.\nPlease install it first.",
                 'err_store_python': "Nuitka does not support Windows Store Python.\nPlease install the official Python from python.org.",
             },
@@ -114,6 +198,7 @@ class MultiPackagerApp(QMainWindow):
                 # Errors
                 'err_title': "错误",
                 'err_no_input': "请先选择输入文件或项目。",
+                'err_py_entry_not_found': "在以下目录中没有找到 Python 入口文件：\n{}\n\n请直接选择 .py 文件，或从检测出的入口文件列表中选择。",
                 'err_tool_missing': "未在环境变量中找到构建工具 '{}'。\n请确保已安装该语言的开发环境。",
                 'err_store_python': "Nuitka 不支持微软商店版 Python (WindowsApps)。\n请去 python.org 下载安装官方版本。",
             }
@@ -372,34 +457,12 @@ class MultiPackagerApp(QMainWindow):
             input_widget.setText(folder)
 
     def scan_python_entry(self, path):
-        if not path or not os.path.exists(path):
-            return
-        
         self.py_entry.clear()
-        if os.path.isfile(path):
-            self.py_entry.addItem(path, path)
-            return
-            
-        # Is folder
-        candidates = []
-        try:
-            for f in os.listdir(path):
-                if f.endswith(".py"):
-                    candidates.append(os.path.join(path, f))
-        except:
-            pass
-            
-        if not candidates:
-            return
-            
-        # Heuristic
-        priority = ['main.py', 'app.py', 'gui.py', 'start.py']
-        best = candidates[0]
-        for c in candidates:
-            self.py_entry.addItem(c, c)
-            if os.path.basename(c).lower() in priority:
-                best = c
-        self.py_entry.setCurrentText(best)
+        for candidate in list_python_entry_candidates(path):
+            self.py_entry.addItem(candidate, candidate)
+
+        if self.py_entry.count() > 0:
+            self.py_entry.setCurrentText(self.py_entry.itemText(0))
 
     def check_tool(self, cmd_name):
         return shutil.which(cmd_name) is not None
@@ -420,12 +483,16 @@ class MultiPackagerApp(QMainWindow):
             QMessageBox.critical(self, self.tr('err_title'), str(e))
 
     def build_python(self):
-        entry = self.py_entry.currentText()
-        if not entry:
-            entry = self.py_input.text()
-            
+        entry = (self.py_entry.currentText() or self.py_input.text()).strip()
+
         if not entry or not os.path.exists(entry):
             raise Exception(self.tr('err_no_input'))
+
+        if os.path.isdir(entry):
+            resolved_entry = resolve_python_entry(entry)
+            if not resolved_entry:
+                raise Exception(self.tr('err_py_entry_not_found').format(entry))
+            entry = resolved_entry
 
         project_dir = os.path.dirname(entry)
         backend_idx = self.py_backend.currentIndex()
